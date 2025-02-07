@@ -55,7 +55,7 @@ byte readLED = 13; //Blinks with each data read
 
 void setup()
 {
-  Serial.begin(115200); // initialize serial communication at 115200 bits per second:
+  Serial.begin(9600); // initialize serial communication at 9600 bits per second:
 
   pinMode(pulseLED, OUTPUT);
   pinMode(readLED, OUTPUT);
