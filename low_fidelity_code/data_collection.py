@@ -1,3 +1,5 @@
+# Data collection for first NIR in box system
+
 import serial
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -10,6 +12,11 @@ import os
 import atexit
 
 latest_intensity = None     # Stores the most recent sensor reading
+data_ready_event = threading.Event()
+last_toggle_time = 0
+start_time = 0
+red = None
+ir = None
 
 # Set up serial connection
 serial_port = 'COM6'
@@ -18,8 +25,9 @@ ser = serial.Serial(serial_port, baud_rate, timeout=0.05)
 ser.reset_input_buffer()    # Clear buffer to avoid lag
 
 # Initialize lists to store data
-time_window = 50   # Number of points to display
-diode_data = [0] * time_window
+time_window = 20   # Number of points to display
+# red_light_data = [0] * time_window
+ir_light_data = [0] * time_window
 time_points = np.arange(time_window)
 
 # Set up figure and subplots
@@ -27,11 +35,11 @@ fig, (ax1) = plt.subplots(1, 1, figsize=(8,6))
 fig.suptitle("Real time photodiode data")
 
 # Line elements for each subplot
-line1, = ax1.plot(time_points, diode_data, label="Photodiode", color='r')
+line1, = ax1.plot(time_points, ir_light_data, label="Photodiode Reading", color = 'r')
 
 # Formatting
 ax1.set_xlim(0, time_window)
-ax1.set_ylim(0,100)
+ax1.set_ylim(0,300)
 ax1.legend()
 ax1.grid()
 
@@ -44,43 +52,47 @@ csv_writer = None
 
 # Function to start recording data
 def record_data():
-    global recording, csv_file, csv_writer, latest_intensity
-    intensity_buffer = []   # To store last 10 recordings (for smoothing average)
+    global recording, csv_file, csv_writer, latest_intensity, red, ir
+    # intensity_buffer = []   # To store last 10 recordings (for smoothing average)
+
+    last_written_time = 0
 
     while True:
-        if recording and latest_intensity is not None:
-            try:
-                intensity_buffer.append(latest_intensity)
 
-                if len(intensity_buffer) > 20:
-                    intensity_buffer.pop(0)
-                
-                smoothed_buffer = sum(intensity_buffer)/len(intensity_buffer)
+        data_ready_event.wait()
 
-                timestamp = time.time()
-
-                csv_writer.writerow([timestamp, smoothed_buffer])
-                csv_file.flush()    # Ensure immediate write
-
-            except Exception as e:
-                print("Recording Error:", e)
+        if recording and ir is not None:
+            timestamp = time.time()
+            if timestamp - last_written_time > 0.01:
+                csv_writer.writerow([timestamp, ir])
+                csv_file.flush()
+                # last_written_time = timestamp
         
+        data_ready_event.clear()
         time.sleep(0.005) # Prevent cpu overuse
 
 # Function to toggle recording on spacebar press
 def toggle_record(event):
-    global recording, csv_file, csv_writer, latest_intensity
+    global recording, csv_file, csv_writer, latest_intensity, last_toggle_time, start_time
+
+    current_time = time.time()
+    if current_time - last_toggle_time < 0.5:   # Prevent multiple triggers within 0.5 seconds
+        return  # Ignore this trigger
+    
+    last_toggle_time = current_time
 
     if recording:
         print("Stopping Recording")
         recording = False
         csv_file.close()
+        csv_file = None
         print("Data saved.")
 
     else:
         print("Starting Recording")
 
         # Ensure folder exists
+        start_time = time.time()
         save_folder = "recordings"
         os.makedirs(save_folder, exist_ok = True)
 
@@ -96,7 +108,7 @@ def toggle_record(event):
 
         csv_file = open(filename, "w", newline = "")
         csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(["Time","NIR_Intensity"])
+        csv_writer.writerow(["Time","Photodiode IR Reading"])
 
         print(f"Recording to {filename}")
         recording = True
@@ -108,18 +120,21 @@ keyboard.on_press_key('space', toggle_record)
 
 # Function to update plot
 def update(frame): 
-    global diode_data, latest_intensity
+    global ir_light_data, latest_intensity, red, ir
 
-    if latest_intensity is not None:
-        print(latest_intensity)
-        diode_data.append(latest_intensity)
+    data_ready_event.wait()
 
-        if len(diode_data) >= time_window:
-            diode_data.pop(0)
+    if ir is not None:
+        ir_light_data.append(ir)
+    
+    if len(ir_light_data) >= time_window:
+        ir_light_data.pop(0)
         
         # Apply moving average (over last 10 data points)?
 
-        line1.set_ydata(diode_data)
+        line1.set_ydata(ir_light_data)
+    
+    data_ready_event.clear()
     
     return line1,
 
@@ -160,18 +175,31 @@ def update(frame):
 
 # Read data from serial monitor
 def read_data():
-    global latest_intensity
+    global red, ir
     while True:
         try:
             if ser.in_waiting > 0:  # Check if data is available before reading
-                line = ser.readline().decode('utf-8').strip()
-                if line.isdigit():
-                    latest_intensity = int(line)  # Store the latest valid reading
-                else:
-                    print(f"Invalid data received: {line.encode()}")
+                line = ser.readline().decode('utf-8', errors='ignore').strip()
+                
+                if not line.replace(",", "").replace(".", "").isdigit():
+                    print(f"Ignored non-numeric data: {line.encode()}")
+                    continue  # Skip this iteration
 
+                try:
+                    ir = float(line)
+                    print(f'data: {ir}')
+                    '''values = line.split(",")
+                    if len(line) == 1:
+                        ir = map(float,values)
+                        print(f"data: {ir}")'''
+
+                    data_ready_event.set()
+                    #else:
+                        #print(f"Invalid data received: {line.encode()}")
+                except ValueError as ve:
+                    print(f"Data conversion error {ve}")
         except Exception as e:
-            print("Serial Read Error:", e)
+            print("serial Read Error:", e)
 
         time.sleep(0.001)  # Lower sleep time for faster response
 
@@ -189,10 +217,10 @@ if __name__ == "__main__":
     serial_thread.start()
 
     # Run the animation
-    ani = animation.FuncAnimation(fig, update, interval=5, blit=False)
+    ani = animation.FuncAnimation(fig, update, interval=20, blit=False)
     plt.show()
 
     # Close serial port after the plot window is closed
     ser.close()
 
-    # atexit.register(close_csv)
+    atexit.register(close_csv)
