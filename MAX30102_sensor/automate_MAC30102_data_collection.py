@@ -11,6 +11,7 @@ import threading
 import time
 import os
 import atexit
+import shutil
 
 latest_intensity = None     # Stores the most recent sensor reading
 data_ready_event = threading.Event()
@@ -22,6 +23,7 @@ hr = None
 HRvalid = None
 SpO2 = None
 SpO2valid = None
+temp_filename = None
 
 # Set up serial connection
 serial_port = 'COM6'
@@ -59,7 +61,7 @@ def record_data():
 
 # Function to toggle recording on spacebar press
 def toggle_record(event):
-    global recording, csv_file, csv_writer, latest_intensity, last_toggle_time, start_time
+    global recording, csv_file, csv_writer, latest_intensity, last_toggle_time, start_time, temp_filename
 
     current_time = time.time()
     if current_time - last_toggle_time < 0.5:   # Prevent multiple triggers within 0.5 seconds
@@ -74,6 +76,33 @@ def toggle_record(event):
         csv_file = None
         print("Data saved.")
 
+        custom_filename = input("Enter a name for your file (without extension): ")
+
+        # Sanitize filename to avoid illegal characters
+        custom_filename = "".join(c if c.isalnum() or c in "_-" else "_" for c in custom_filename)
+
+        # Ensure the filename is not empty
+        if not filename:
+            print("Invalid filename! Keeping the original timestamp-based name!")
+        else:
+            new_filepath = os.path.join("recordings", f"{custom_filename}.csv")
+            old_filepath = os.path.join("recordings", f"{temp_filename}.csv")
+        
+            try:
+                shutil.move(old_filepath, new_filepath)
+                print(f"file renamed to {custom_filename}")
+            except Exception as e:
+                print(f"Error renaming file: {e}")
+        
+        # After renaming the file, close the program
+        print("Exiting program...")
+        close_csv()
+        if ser.is_open:
+            ser.close()
+            print("Serial port closed")
+        
+        os.exit(0)  # Immediately terminates the program
+
     else:
         print("Starting Recording")
 
@@ -82,21 +111,16 @@ def toggle_record(event):
         save_folder = "recordings"
         os.makedirs(save_folder, exist_ok = True)
 
-        # Ask user for custom filename
-        #custom_filename = input("Enter a name for your file (without extension): ")
-
-        # Sanitize filename to avoid illegal characters
-        # custom_filename = "".join(c if c.isalnum() or c in "_-" else "_" for c in custom_filename)
-        time_filename = time.time()
+        temp_filename = time.time()
 
         # Generate the full file path
-        filename = os.path.join(save_folder, f"{time_filename}.csv") 
+        filepath = os.path.join(save_folder, f"{temp_filename}.csv") 
 
-        csv_file = open(filename, "w", newline = "")
+        csv_file = open(filepath, "w", newline = "")
         csv_writer = csv.writer(csv_file)
         csv_writer.writerow(["Time","Red_light","IR light", "HR", "HRvalid", "SPO2", "SPO2Valid"])
 
-        print(f"Recording to {filename}")
+        print("Recording data")
         recording = True
 
 # Attach spacebar event listener
@@ -142,8 +166,3 @@ if __name__ == "__main__":
 
     serial_thread = threading.Thread(target=read_data, daemon=True)
     serial_thread.start()
-
-    # Close serial port after the plot window is closed
-    ser.close()
-
-    atexit.register(close_csv)
