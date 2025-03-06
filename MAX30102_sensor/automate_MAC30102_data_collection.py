@@ -10,7 +10,7 @@ import csv
 import threading
 import time
 import os
-import atexit
+import sys
 import shutil
 
 latest_intensity = None     # Stores the most recent sensor reading
@@ -49,7 +49,7 @@ def record_data():
 
         data_ready_event.wait()
 
-        if recording and SpO2 is not None:
+        if recording:
             timestamp = time.time()
             if timestamp - last_written_time > 0.01:
                 
@@ -82,7 +82,7 @@ def toggle_record(event):
         custom_filename = "".join(c if c.isalnum() or c in "_-" else "_" for c in custom_filename)
 
         # Ensure the filename is not empty
-        if not filename:
+        if not custom_filename:
             print("Invalid filename! Keeping the original timestamp-based name!")
         else:
             new_filepath = os.path.join("recordings", f"{custom_filename}.csv")
@@ -96,12 +96,14 @@ def toggle_record(event):
         
         # After renaming the file, close the program
         print("Exiting program...")
-        close_csv()
+
         if ser.is_open:
             ser.close()
             print("Serial port closed")
         
-        os.exit(0)  # Immediately terminates the program
+        close_csv()
+        
+        sys.exit(0)  # Immediately terminates the program
 
     else:
         print("Starting Recording")
@@ -111,7 +113,7 @@ def toggle_record(event):
         save_folder = "recordings"
         os.makedirs(save_folder, exist_ok = True)
 
-        temp_filename = time.time()
+        temp_filename = str(time.time())
 
         # Generate the full file path
         filepath = os.path.join(save_folder, f"{temp_filename}.csv") 
