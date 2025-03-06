@@ -17,6 +17,7 @@ last_toggle_time = 0
 start_time = 0
 red = None
 ir = None
+SpO2 = None
 
 # Set up serial connection
 serial_port = 'COM6'
@@ -31,7 +32,7 @@ ir_light_data = [0] * time_window
 time_points = np.arange(time_window)
 
 # Set up figure and subplots
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8,6))
+'''fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8,6))
 fig.suptitle("Real time photodiode data (Red light, IR light)")
 
 # Line elements for each subplot
@@ -39,11 +40,11 @@ line1, = ax1.plot(time_points, red_light_data, label="Red light", color='r')
 line2, = ax2.plot(time_points, ir_light_data, label="IR light", color = 'g')
 
 # Formatting
-'''for ax in (ax1, ax2):
+for ax in (ax1, ax2):
     ax.set_xlim(0, time_window)
     ax.set_ylim(0,300000)
     ax.legend()
-    ax.grid()'''
+    ax.grid()
 
 ax1.set_xlim(0, time_window)
 ax1.set_ylim(0, 300000)
@@ -53,7 +54,7 @@ ax1.grid()
 ax2.set_xlim(0, time_window)
 ax2.set_ylim(0, 110)
 ax2.legend()
-ax2.grid()
+ax2.grid()'''
 
 # -----------------------------------------------------------------------------------------------
 
@@ -73,10 +74,11 @@ def record_data():
 
         data_ready_event.wait()
 
-        if recording and red and ir is not None:
+        if recording and SpO2 is not None:
             timestamp = time.time()
             if timestamp - last_written_time > 0.01:
-                csv_writer.writerow([timestamp, red, ir])
+                
+                csv_writer.writerow([timestamp, red, ir, ]) # This is modular
                 csv_file.flush()
                 # last_written_time = timestamp
         
@@ -120,7 +122,7 @@ def toggle_record(event):
 
         csv_file = open(filename, "w", newline = "")
         csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(["Time","Red_light","IR light"])
+        csv_writer.writerow(["Time","Red_light","IR light"])    # This is modular
 
         print(f"Recording to {filename}")
         recording = True
@@ -132,22 +134,22 @@ keyboard.on_press_key('space', toggle_record)
 
 # Function to update plot
 def update(frame): 
-    global red_light_data, ir_light_data, latest_intensity, red, ir
+    global red_light_data, ir_light_data, latest_intensity, red, ir # modular
 
     data_ready_event.wait()
 
-    if red is not None and ir is not None:
+    if red is not None and ir is not None:  # modular
         red_light_data.append(red)
         ir_light_data.append(ir)
     
-    if len(red_light_data) >= time_window:
+    if len(red_light_data) >= time_window:  # modular
         red_light_data.pop(0)
         ir_light_data.pop(0)
         
         # Apply moving average (over last 10 data points)?
 
-        line1.set_ydata(red_light_data)
-        line2.set_ydata(ir_light_data)
+        line1.set_ydata(red_light_data)     # modular
+        line2.set_ydata(ir_light_data)      # modular
     
     data_ready_event.clear()
     
@@ -190,7 +192,7 @@ def update(frame):
 
 # Read data from serial monitor
 def read_data():
-    global red, ir
+    global red, ir  # modular
     while True:
         try:
             if ser.in_waiting > 0:  # Check if data is available before reading
@@ -202,9 +204,9 @@ def read_data():
 
                 try:
                     values = line.split(",")
-                    if len(values) == 2:
-                        red, ir = map(float,values)
-                        print(f"data: {red}, {ir}")
+                    if len(values) == 6:
+                        red, ir = map(float,values) # modular
+                        print(f"data: {red}, {ir}") # modular
 
                         data_ready_event.set()
                     else:
