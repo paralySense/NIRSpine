@@ -220,8 +220,12 @@ def close_csv():
         print("CSV file closed.")
 
 if __name__ == "__main__":
+    print("Starting Program")
+    
     recording_thread = threading.Thread(target=record_data, daemon=True)
     recording_thread.start()
 
     serial_thread = threading.Thread(target=read_data, daemon=True)
     serial_thread.start()
+
+    print("Finishing program")
