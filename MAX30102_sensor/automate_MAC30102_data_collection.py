@@ -13,7 +13,6 @@ import os
 import sys
 import shutil
 
-latest_intensity = None     # Stores the most recent sensor reading
 data_ready_event = threading.Event()
 last_toggle_time = 0
 start_time = 0
@@ -39,9 +38,21 @@ csv_writer = None
 # Function to start recording data
 def record_data():
     """
-    Writes 
+    Continuously writes sensor data to a CSV file while recording is active.
+
+    This function runs in a background thread and writes time-stamped sensor readings 
+    (red light, IR light, heart rate, and SpO2) to an open CSV file. It ensures that
+    data is written at a controlled rate to avoid excessive CPU usage.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
     """
-    global recording, csv_file, csv_writer, latest_intensity, red, ir, hr, HRvalid, SpO2, SpO2valid
+    global recording, csv_file, csv_writer, red, ir, hr, HRvalid, SpO2, SpO2valid
 
     last_written_time = 0
 
@@ -61,7 +72,24 @@ def record_data():
 
 # Function to toggle recording on spacebar press
 def toggle_record(event):
-    global recording, csv_file, csv_writer, latest_intensity, last_toggle_time, start_time, temp_filename
+    """
+    Starts or stops data recording when a spacebar is pressed.
+
+    If recording is not active, this function initializes a new CSV file and starts
+    logging sensor data. If recording is active, it stops logging and prompts the user
+    to enter a custom filename, renames the file to that name, and exits the program.
+
+    Parameters
+    ----------
+    event : keyboard.KeyboardEvent
+        The keyboard event triggered by pressing the spacebar.
+
+    Returns
+    -------
+    None
+
+    """
+    global recording, csv_file, csv_writer, last_toggle_time, start_time, temp_filename
 
     current_time = time.time()
     if current_time - last_toggle_time < 0.5:   # Prevent multiple triggers within 0.5 seconds
@@ -130,6 +158,21 @@ keyboard.on_press_key('space', toggle_record)
 
 # Read data from serial monitor
 def read_data():
+    """
+    Reads and processes incoming data from the serial port.
+
+    This function continuously monitors the serial port for incoming data. It
+    reads sensor values, filters out invalid data, and updates global variables.
+    If valid data is received, it sets an event flag to signal availability.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
     global red, ir, hr, HRvalid, SpO2, SpO2valid
     while True:
         try:
@@ -157,6 +200,20 @@ def read_data():
         time.sleep(0.001)  # Lower sleep time for faster response
 
 def close_csv():
+    """
+    Closes the currently open CSV file.
+
+    Ensures that all buffered data is written to disk before closing the file.
+    Prevents data corruption or loss in case of an unexpected termination.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
     global csv_file
     if csv_file:
         csv_file.close()
