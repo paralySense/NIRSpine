@@ -75,9 +75,9 @@ def toggle_record(event):
     """
     Starts or stops data recording when a spacebar is pressed.
 
-    If recording is not active, this function initializes a new CSV file and starts
-    logging sensor data. If recording is active, it stops logging and prompts the user
-    to enter a custom filename, renames the file to that name, and exits the program.
+    If recording is not active, upon spacebar press this function initializes a new CSV file
+    and starts logging sensor data. If recording is active, upon spacebar press it stops logging
+    and prompts the user to enter a custom filename, renames the file to that name, and exits the program.
 
     Parameters
     ----------
