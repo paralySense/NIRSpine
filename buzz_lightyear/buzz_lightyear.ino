@@ -84,7 +84,7 @@ void setup()
   //Serial.read();
 
   //byte ledBrightness = 100; //Options: 0=Off to 255=50mA
-  byte ledBrightness = 0;
+  byte ledBrightness = 60;
   byte sampleAverage = 4; //Options: 1, 2, 4, 8, 16, 32
   byte ledMode = 2; //Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
   byte sampleRate = 100; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
@@ -212,6 +212,7 @@ void loop()
     }
 
     //After gathering 25 new samples recalculate HR and SP02
+    // maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     calculate_spo2_dynamic_beat_to_beat(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2);
   }
 }
